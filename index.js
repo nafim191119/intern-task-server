@@ -1,9 +1,8 @@
 const express = require('express');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const fileUpload = require('express-fileupload');
-const path = require('path');
 
 dotenv.config();
 
@@ -74,6 +73,42 @@ async function run() {
             }
         });
 
+        // Route to fetch all users
+        app.get('/api/users', async (req, res) => {
+            try {
+                const users = await storage.find().toArray();
+                res.status(200).json(users);
+            } 
+            catch (error) {
+                console.error('Error fetching users:', error);
+                res.status(500).json({ message: 'Internal Server Error' });
+            }
+        });
+
+        // Route to download a user's resume
+        app.get('/api/download/:id', async (req, res) => {
+            try {
+                const { id } = req.params;
+                const user = await storage.findOne({ _id: new ObjectId(id) });
+
+                if (!user || !user.resume) {
+                    return res.status(404).json({ message: 'Resume not found' });
+                }
+
+                res.set({
+                    'Content-Type': user.resume.contentType,
+                    'Content-Disposition': `attachment; filename="${user.resume.name}"`,
+                });
+
+                res.send(user.resume.data);
+            } 
+            catch (error) {
+                console.error('Error downloading resume:', error);
+                res.status(500).json({ message: 'Internal Server Error' });
+            }
+        });
+
+        // Start the server
         app.listen(port, () => {
             console.log(`Server running on port ${port}`);
         });
