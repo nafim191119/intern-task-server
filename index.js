@@ -40,7 +40,7 @@ async function run() {
 
         app.post('/api/signup', async (req, res) => {
             try {
-                const { name, email } = req.body;
+                const { name, email, phone, salary, department } = req.body;
                 const resume = req.files?.resume;
 
                 if (!resume) {
@@ -56,6 +56,9 @@ async function run() {
                 const newUser = {
                     name,
                     email,
+                    phone,
+                    salary,
+                    department,
                     resume: resumeData,
                 };
 
