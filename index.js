@@ -9,17 +9,23 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
+const allowedOrigins = ['https://interns-task.vercel.app', 'http://localhost:5173'];
+
 app.use(cors({
-    origin: 'https://interns-task.vercel.app/',
+    origin: function (origin, callback) {
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware to handle file uploads
 app.use(fileUpload());
 
-// MongoDB connection URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.2go6xuw.mongodb.net/task?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
@@ -53,7 +59,7 @@ async function run() {
                     contentType: resume.mimetype,
                 };
 
-                const newUser = {
+                const userData = {
                     name,
                     email,
                     phone,
@@ -62,62 +68,19 @@ async function run() {
                     resume: resumeData,
                 };
 
-                const result = await storage.insertOne(newUser);
-
-                if (result.insertedId) {
-                    res.status(201).json({ message: 'User registered successfully!' });
-                } else {
-                    res.status(500).json({ message: 'Failed to register user' });
-                }
-            }
-            catch (error) {
-                console.error('Error during user registration:', error);
-                res.status(500).json({ message: 'Internal Server Error' });
+                const result = await storage.insertOne(userData);
+                res.status(201).json({ message: 'User registered successfully', userId: result.insertedId });
+            } catch (error) {
+                console.error('Error during registration:', error);
+                res.status(500).json({ message: 'Internal server error' });
             }
         });
 
-        // Route to fetch all users
-        app.get('/api/users', async (req, res) => {
-            try {
-                const users = await storage.find().toArray();
-                res.status(200).json(users);
-            } 
-            catch (error) {
-                console.error('Error fetching users:', error);
-                res.status(500).json({ message: 'Internal Server Error' });
-            }
-        });
-
-        // Route to download a user's resume
-        app.get('/api/download/:id', async (req, res) => {
-            try {
-                const { id } = req.params;
-                const user = await storage.findOne({ _id: new ObjectId(id) });
-
-                if (!user || !user.resume) {
-                    return res.status(404).json({ message: 'Resume not found' });
-                }
-
-                res.set({
-                    'Content-Type': user.resume.contentType,
-                    'Content-Disposition': `attachment; filename="${user.resume.name}"`,
-                });
-
-                res.send(user.resume.data);
-            } 
-            catch (error) {
-                console.error('Error downloading resume:', error);
-                res.status(500).json({ message: 'Internal Server Error' });
-            }
-        });
-
-        // Start the server
         app.listen(port, () => {
-            console.log(`Server running on port ${port}`);
+            console.log(`Server running at http://localhost:${port}`);
         });
-    }
-    catch (err) {
-        console.error('Error connecting to MongoDB:', err);
+    } catch (error) {
+        console.error('Error connecting to MongoDB:', error);
     }
 }
 
